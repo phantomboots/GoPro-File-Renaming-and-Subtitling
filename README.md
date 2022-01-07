@@ -13,6 +13,15 @@ The script compares the GoPro file start time to the time periods between vehicl
 
 Renamed files are put in the same directory as the input file set -- this behaviour could be easily modified by altering the value of 'dest_path', near the end of this script.
 
-**GoPro Subtitler**
+**GoPro Subtitler.py**
 
-In progress.
+This script should be run after running GoPro Rename.py, it does not rename any GoPro files on its own. It is also only tested on windows.
+
+This script also makes use of Python bindings to an executable called exiftool. This executable must be located in a directory on the local machine running this script, and the directory must be accessible. The name of this directory must be entered into the relevant location in the script.
+
+The script will use exiftool to read in the File Names, created data and duration (seconds) for each video file in the directory that the user specifies. Next, a new data frame is built with one record for each second of each video file in the user specified directory. A column of YYYY-MM-DD HH:MM:SS is generated to hold each of these timestamps. File Name is retained as second column.
+
+A processed NAV data file (made using NDST R scripts in the Phantom Data Processing Repository on this github) is read in as a data frame, and should contain a full 1 Hz time series of data collected by the vehicle that the GoPro was mounted on. This includes time, depth, lat/long, altitude, heading, etc. The video time stamp dataframe 
+is merged with the video time stamp data frame (left join). The resulting merged data frame will contain NAV data values for the portion of the time that the recorded GoPro files were on transect, but no NAV data for the portions of the video that were off transect. This is due to the fact that the NAV data processing scripts only extract that data that was on transect. 
+
+A function is implemeneted to generate the .SRT data structure (https://docs.fileformat.com/video/srt/#:~:text=SRT%20(SubRip%20file%20format)%20is,content%20after%20it%20is%20produced). For portions of the GoPro recording that are 'off transect' the .SRT shows the dive number, the UTC time and 'OFF TRANSECT' on the subtitle. When on transect, the subtitle will contain the dive number, UTC timestamp, smoothed ROV lat/long, depth and altitude.
