@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+## -*- coding: utf-8 -*-
 """
 Created on Mon Nov 15 10:17:49 2021
 
@@ -8,7 +8,6 @@ Created on Mon Nov 15 10:17:49 2021
 import exiftool
 from pathlib import Path
 import re
-import os
 import pandas as pd
 import time
 import math
@@ -17,15 +16,15 @@ import math
 
 #Root directory where GoPro video files are stored
 
-root_dir = Path("D:/GoPro_Video")
+root_dir = Path("D:/GoPro")
 
 #Directory with the NAV files are stored
 
-nav_dir = Path("C:/Users/SnowBe/Documents/Projects/Anchor Scour Cumulative Effects_2021_22/Data/Final_Processed_Data")
+nav_dir = Path("C:/Users/SnowBe/Documents/Projects/Feb2022_ROV_Sponge_Coral_MPA/Data/3.Final_Processed_Data")
 
 #Project Name
 
-project = "Anchor Scour 2021"
+project = "PAC2022-005"
 
 ###################################### RUN EXIFTOOL TO EXTRACT GOPRO RECORDINGS EXIF TAGS ############################################
 
@@ -93,7 +92,7 @@ for row, content in metadata_df["FileName"].items():
 
 #Empty data frame to fill with new timeseries, using same column names as above.
 
-timesdf = pd.DataFrame(data = None, columns = ['date_time', 'FileName'])
+timesdf = pd.DataFrame(data = None, columns = ['Datetime', 'FileName'])
 
 #For each unique video file, generate a second by second time series index from the "CreatedDate" timestamp, by corresponding
 #Length of the "DurationsSeconds" value for that same video file. Generate a time series indexed DataFrame and append it to the 
@@ -101,7 +100,7 @@ timesdf = pd.DataFrame(data = None, columns = ['date_time', 'FileName'])
 
 for i in range(len(metadata_df)):
     videoseconds = pd.Series(pd.date_range(metadata_df.at[i, "CreatedDate"], periods = metadata_df.at[i, "DurationSeconds"], freq = "S"))
-    videotimes = pd.DataFrame({"date_time": videoseconds, "FileName": metadata_df.at[i, "FileName"]}) #Make sure the date_time column has the same column title as the processed NAV data
+    videotimes = pd.DataFrame({"Datetime": videoseconds, "FileName": metadata_df.at[i, "FileName"]}) #Make sure the date_time column has the same column title as the processed NAV data
     timesdf = timesdf.append(videotimes)
 
 ################################################READ IN THE PROCESSED NAV DATA ##############################################
@@ -110,10 +109,15 @@ for i in range(len(metadata_df)):
     
 nav_paths = []
 
-#Get file names, append to empty list.
+#Get file names, append to empty list. It is possible that the Hypack Data processing may generate RData files in this directory
+#if the file does not have a .CSV extension, do no append to list of directory names.
+#There is likely also a .CSV file in this directory that contains all transect date, with the suffix "_All_Transects". Don't read this in.
+
+all_transects = re.compile("All_Transects")
 
 for each in nav_dir.iterdir():
-    nav_paths.append(each)
+    if(each.suffix == ".csv" and all_transects.search(each.stem) is None): 
+        nav_paths.append(each)
 
 #Read and concatenate the files to a single dataframe in the step below.
 
@@ -122,13 +126,13 @@ navdf = pd.concat((pd.read_csv(f) for f in nav_paths), ignore_index = True)
 
 #Convert the date_time column to a datetime64[ns] dtype
 
-navdf["date_time"] = navdf["date_time"].astype("datetime64[ns]")
+navdf["Datetime"] = navdf["Datetime"].astype("datetime64[ns]")
 
 ###############################################JOIN THE DATA FROM THE NAV FILES TO THE VIDEO TIME SERIES ###################
 
 #Let the time series df be the left data frame; use pd.merge() with a left join, on the 'date_time' column as a key.
 
-mergeddf = pd.merge(timesdf, navdf, how="left", on = "date_time")
+mergeddf = pd.merge(timesdf, navdf, how="left", on = "Datetime")
 
 ###############################################GENERATE AND WRITE A .SRT FILE ##############################################
 
@@ -154,14 +158,14 @@ Text 2 to display
 """
 
 def srt_writer(i, df):
-    if(math.isnan(df["Beacon_Lat_loess"].at[i])):
+    if(math.isnan(df["ROV_Latitude_loess"].at[i])):
         return(
             f'{i+1}\n'
             f'{time.strftime("%H:%M:%S", time.gmtime(i))} --> {time.strftime("%H:%M:%S", time.gmtime(i+1))}\n'
             f'OFF TRANSECT - NO NAV DATA\n'
             f'Dive Number: {re.split("_", df["FileName"].at[0])[1]}\n'
             f'Project: {project}\n'
-            f'UTC Timestamp: {df["date_time"].at[i]}\n'
+            f'UTC Timestamp: {df["Datetime"].at[i]}\n'
             f'\n'
             )
     else:
@@ -170,10 +174,10 @@ def srt_writer(i, df):
             f'{time.strftime("%H:%M:%S", time.gmtime(i))} --> {time.strftime("%H:%M:%S", time.gmtime(i+1))}\n'
             f'Dive Number: {re.split("_", df["FileName"].at[0])[1]}\n'
             f'Project: {project}\n'
-            f'UTC Timestamp: {df["date_time"].at[i]}\n'
+            f'UTC Timestamp: {df["Datetime"].at[i]}\n'
             f'Depth_m: {round(df["Depth_m"].at[i], 1)}\n'
-            f'ROV Lat: {round(df["Beacon_Lat_loess"].at[i], 5)}\n'
-            f'ROV Long: {round(df["Beacon_Long_loess"].at[i], 5)}\n'
+            f'ROV Lat: {round(df["ROV_Latitude_loess"].at[i], 5)}\n'
+            f'ROV Long: {round(df["ROV_Longitude_loess"].at[i], 5)}\n'
             f'Altitude_m: {round(df["Altitude_m"].at[i], 1)}\n'
             f'\n'
             )
